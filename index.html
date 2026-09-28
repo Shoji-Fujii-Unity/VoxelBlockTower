@@ -1,0 +1,1818 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>3D Voxel Block Tower</title>
+
+  <style>
+    :root {
+      --bg0: #05101f;
+      --bg1: #0d1a2f;
+      --panel: rgba(11, 24, 48, 0.90);
+      --line: #264070;
+      --text: #e9f2ff;
+      --muted: #9bb0d0;
+      --ok: #56d279;
+      --warn: #e04f5f;
+      --accent: #54c8ff;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      overscroll-behavior: none;
+      touch-action: none;
+      color: var(--text);
+      font-family: ui-rounded, system-ui, -apple-system, "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+      background: linear-gradient(180deg, var(--bg0), var(--bg1));
+    }
+
+    #app {
+      position: fixed;
+      inset: 0;
+    }
+
+    #gameCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      outline: none;
+    }
+
+    #topbar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 60;
+      padding: max(10px, env(safe-area-inset-top)) 10px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      pointer-events: auto;
+      user-select: none;
+      text-shadow: 0 2px 10px #000a;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .title {
+      font-weight: 900;
+      letter-spacing: .02em;
+      white-space: nowrap;
+    }
+
+    .tag {
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .buttons {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      background: #10213f;
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 10px;
+      font: inherit;
+      font-weight: 800;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    button.primary {
+      background: #123a68;
+      border-color: #3d6aa7;
+    }
+
+    button:disabled {
+      opacity: .35;
+      cursor: default;
+    }
+
+    #pauseBtn {
+      background: #1b1335;
+      border-color: #3c325f;
+    }
+
+    #hud {
+      position: absolute;
+      z-index: 45;
+      left: 0;
+      right: 0;
+      top: calc(max(10px, env(safe-area-inset-top)) + 50px);
+      display: flex;
+      justify-content: center;
+      pointer-events: none;
+      user-select: none;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    #hudBox {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      background: rgba(5, 16, 31, 0.58);
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .stat b {
+      color: var(--text);
+    }
+
+    #tapHint {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 18px;
+      text-align: center;
+      color: #cfe2ff;
+      font-size: 12px;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .panel {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: none;
+      place-items: center;
+      padding: 72px 14px 14px;
+      background: rgba(2, 9, 18, 0.62);
+      pointer-events: auto;
+      user-select: none;
+    }
+
+    .panel.show {
+      display: grid;
+    }
+
+    .box {
+      width: min(860px, 100%);
+      max-height: calc(100dvh - 78px);
+      overflow: auto;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 18px 55px #0007;
+      padding: 14px 14px 16px;
+      backdrop-filter: blur(6px);
+    }
+
+    h1,h2 {
+      margin: 0;
+      font-weight: 900;
+    }
+
+    h1 {
+      font-size: 26px;
+    }
+
+    h2 {
+      font-size: 18px;
+      margin-top: 6px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 6px;
+    }
+
+    .panelButtons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      justify-content: space-between;
+      margin-top: 12px;
+    }
+
+    #stageGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(66px, 1fr));
+      gap: 8px;
+      max-height: min(62vh, 460px);
+      overflow: auto;
+      padding: 4px;
+    }
+
+    .chip {
+      width: 100%;
+      height: 58px;
+      border-radius: 12px;
+      padding: 8px 6px;
+      border: 1px solid #29436f;
+      background: #0d1d39;
+      color: var(--text);
+      font-size: 10px;
+      text-align: center;
+      overflow: hidden;
+      line-height: 1.1;
+      position: relative;
+    }
+
+    .chip strong {
+      display: block;
+      font-size: 17px;
+      line-height: 1.1;
+    }
+
+    .chip small {
+      display: block;
+      color: var(--muted);
+      margin-top: 4px;
+      font-size: 10px;
+    }
+
+    .chip .star {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      color: #ffd166;
+      font-size: 13px;
+    }
+
+    .chip.cleared {
+      border-color: rgba(111,255,171,.5);
+      background: #102e26;
+    }
+
+    .chip.locked {
+      opacity: .35;
+      filter: grayscale(0.8);
+    }
+
+    .page {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 900;
+    }
+
+    .result {
+      text-align: center;
+    }
+
+    .result h2 {
+      font-size: 28px;
+    }
+
+    .result .big {
+      font-size: 32px;
+      margin: 10px 0;
+    }
+
+    .result .stats {
+      color: var(--muted);
+    }
+
+    #portraitHint {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      display: none;
+      place-items: center;
+      padding: 24px;
+      text-align: center;
+      background: #081426;
+    }
+
+    #portraitHint .rot {
+      width: 150px;
+      height: 80px;
+      border: 3px solid #63a0d6;
+      border-radius: 14px;
+      margin: 0 auto 24px;
+    }
+
+    #portraitHint p {
+      margin: 16px 0 0;
+      font-size: 20px;
+      font-weight: 900;
+      line-height: 1.5;
+    }
+
+    @media (orientation: portrait) and (pointer: coarse) {
+      #portraitHint {
+        display: grid;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .title {
+        font-size: 15px;
+      }
+      .tag {
+        display: none;
+      }
+      button {
+        padding: 8px 8px;
+        font-size: 11px;
+      }
+      .box {
+        padding: 12px 10px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <canvas id="gameCanvas"></canvas>
+
+    <header id="topbar">
+      <div class="brand">
+        <span class="title" id="title">3D Voxel Block Tower</span>
+        <span class="tag" id="tag">Stacker</span>
+      </div>
+      <div class="buttons">
+        <button id="langBtn">EN</button>
+        <button id="soundBtn">Sound: ON</button>
+        <button id="pauseBtn" class="primary">PAUSE</button>
+      </div>
+    </header>
+
+    <div id="hud">
+      <div id="hudBox">
+        <div class="stat"><span id="lblStage">STAGE</span> <b id="stageNo">-</b></div>
+        <div class="stat"><span id="lblScore">DROP</span> <b id="scoreVal">0</b>/<b id="goalVal">0</b></div>
+        <div class="stat"><span id="lblBest">BEST</span> <b id="bestVal">0</b></div>
+      </div>
+    </div>
+
+    <div id="tapHint">Tap / Space to drop</div>
+
+    <section id="stagePanel" class="panel">
+      <div class="box">
+        <h1 id="menuTitle">3D Voxel Block Tower</h1>
+        <div class="subtitle" id="menuSub">100 stages / save / sound on/off</div>
+
+        <div class="panelButtons">
+          <button id="stageResumeBtn" class="primary" style="display:none;">Return</button>
+        </div>
+
+        <div class="row">
+          <button id="prevPage" aria-label="prev page">«</button>
+          <div class="page" id="stagePageInfo">Page 1/4</div>
+          <button id="nextPage" aria-label="next page">»</button>
+        </div>
+
+        <div id="stageGrid" role="listbox"></div>
+      </div>
+    </section>
+
+    <section id="pausePanel" class="panel">
+      <div class="box">
+        <h2 id="pauseTitle">PAUSE</h2>
+        <div class="panelButtons">
+          <button id="pauseResumeBtn" class="primary">Resume</button>
+          <button id="pauseRestartBtn">Restart</button>
+          <button id="pauseToStageBtn">Stage Select</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="resultPanel" class="panel">
+      <div class="box result">
+        <h2 id="resultTitle">Clear</h2>
+        <div class="big" id="resultScore">0/10</div>
+        <div class="stats" id="resultStats"></div>
+        <div class="panelButtons">
+          <button id="resultRetryBtn" class="primary">Retry</button>
+          <button id="resultNextBtn" disabled>Next</button>
+          <button id="resultMenuBtn">Stage Select</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="portraitHint">
+      <div>
+        <div class="rot"></div>
+        <p id="portraitText">Please play in landscape mode</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 三番目にある import 警告や読み込み失敗だけ先に拾うための軽いガード -->
+  <script>
+    window.addEventListener("error", function(ev) {
+      var message = String((ev && ev.message) || "");
+      var menuSub = document.getElementById("menuSub");
+      var hint = document.getElementById("tapHint");
+
+      if (message.indexOf("three") !== -1 ||
+          message.indexOf("dynamically imported") !== -1 ||
+          message.indexOf("Cannot find module") !== -1) {
+        if (menuSub) menuSub.textContent = "Failed to load three.js. Please check your network or CDN availability.";
+        if (hint) hint.textContent = "Failed to load three.js.";
+      }
+    });
+  </script>
+
+  <script type="module">
+    // 【重要】three.min.js はやめ、ES Modules版を使う
+    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js";
+
+    const SAVE_KEY = "voxel-3d-block-tower-save-v4";
+    const TOTAL_STAGES = 100;
+    const STAGE_PAGE_SIZE = 25;
+    const STAGE_PAGES = Math.ceil(TOTAL_STAGES / STAGE_PAGE_SIZE);
+
+    const BLOCK_H = 0.68;
+    const H_REPEAT = 1.1;
+    const MIN_OVERLAP = 0.11;
+
+    const STRINGS = {
+      ja: {
+        title: "3Dボクセル・ブロックタワー",
+        tag: "スタックゲーム",
+        menuSub: "100ステージ / ローカル保存 / サウンド切替",
+        sound: "音",
+        soundOn: "ON",
+        soundOff: "OFF",
+        lblStage: "ST",
+        lblScore: "投下",
+        lblBest: "記録",
+        stageResume: "ゲームに戻る",
+        pause: "一時停止",
+        pauseResume: "再開",
+        pauseRestart: "リトライ",
+        pauseToStage: "ステージ選択",
+        resultRetry: "リトライ",
+        resultNext: "次のステージ",
+        resultMenu: "ステージ選択",
+        resultClear: "ステージクリア",
+        resultFail: "ミス！",
+        saved: "進行を保存しました",
+        progress: "記録 {v}/{g}",
+        page: "Page {v}/{g}",
+        hint: "タップまたはスペースで置く",
+        nextLocked: "次のステージはクリア後に解放",
+        portrait: "スマートフォンは横画面で遊んでください"
+      },
+      en: {
+        title: "3D Voxel Block Tower",
+        tag: "Stacker",
+        menuSub: "100 stages / local save / sound toggle",
+        sound: "Sound",
+        soundOn: "ON",
+        soundOff: "OFF",
+        lblStage: "ST",
+        lblScore: "DROP",
+        lblBest: "BEST",
+        stageResume: "Resume game",
+        pause: "PAUSE",
+        pauseResume: "Resume",
+        pauseRestart: "Retry",
+        pauseToStage: "Stage Select",
+        resultRetry: "Retry",
+        resultNext: "Next Stage",
+        resultMenu: "Stage Select",
+        resultClear: "Stage Clear",
+        resultFail: "Miss!",
+        saved: "Progress saved",
+        progress: "Score {v}/{g}",
+        page: "Page {v}/{g}",
+        hint: "Tap / Space to drop",
+        nextLocked: "Unlock next by clearing",
+        portrait: "Please play in landscape mode"
+      }
+    };
+
+    let lang = (navigator.language || "en").toLowerCase().startsWith("ja") ? "ja" : "en";
+    let soundOn = true;
+    let stagePage = 0;
+
+    let state = {
+      best: {},
+      maxUnlocked: 1
+    };
+
+    let currentGame = null;
+    let currentPanel = null;
+    let inputActive = false;
+
+    let scene = null;
+    let camera = null;
+    let renderer = null;
+    let sharedBlockGeom = null;
+    let baseCheckerTexture = null;
+
+    let lookSmooth = 0;
+    let clockPrev = performance.now();
+
+    // -----------------------------------------
+    // DOM
+    // -----------------------------------------
+    function q(id) {
+      return document.getElementById(id);
+    }
+
+    const ui = {
+      canvas: q("gameCanvas"),
+      topbar: q("topbar"),
+      title: q("title"),
+      tag: q("tag"),
+      stagePanel: q("stagePanel"),
+      pausePanel: q("pausePanel"),
+      resultPanel: q("resultPanel"),
+      langBtn: q("langBtn"),
+      soundBtn: q("soundBtn"),
+      pauseBtn: q("pauseBtn"),
+      stageGrid: q("stageGrid"),
+      prevPage: q("prevPage"),
+      nextPage: q("nextPage"),
+      stagePageInfo: q("stagePageInfo"),
+      stageResumeBtn: q("stageResumeBtn"),
+      menuTitle: q("menuTitle"),
+      menuSub: q("menuSub"),
+      lblStage: q("lblStage"),
+      lblScore: q("lblScore"),
+      lblBest: q("lblBest"),
+      stageNo: q("stageNo"),
+      scoreVal: q("scoreVal"),
+      goalVal: q("goalVal"),
+      bestVal: q("bestVal"),
+      tapHint: q("tapHint"),
+      pauseTitle: q("pauseTitle"),
+      pauseResumeBtn: q("pauseResumeBtn"),
+      pauseRestartBtn: q("pauseRestartBtn"),
+      pauseToStageBtn: q("pauseToStageBtn"),
+      resultTitle: q("resultTitle"),
+      resultScore: q("resultScore"),
+      resultStats: q("resultStats"),
+      resultRetryBtn: q("resultRetryBtn"),
+      resultNextBtn: q("resultNextBtn"),
+      resultMenuBtn: q("resultMenuBtn"),
+      portraitText: q("portraitText")
+    };
+
+    const panels = {
+      stagePanel: ui.stagePanel,
+      pausePanel: ui.pausePanel,
+      resultPanel: ui.resultPanel
+    };
+
+    // -----------------------------------------
+    // i18n helpers
+    // -----------------------------------------
+    function setText(id, text) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text;
+    }
+
+    function tt(key, args) {
+      let s = STRINGS[lang] && STRINGS[lang][key];
+      if (!s) s = STRINGS.en[key] || key;
+
+      if (args) {
+        for (const k in args) {
+          s = s.split("{" + k + "}").join(String(args[k]));
+        }
+      }
+      return s;
+    }
+
+    // -----------------------------------------
+    // save
+    // -----------------------------------------
+    function loadSave() {
+      try {
+        const raw = localStorage.getItem(SAVE_KEY);
+        if (!raw) return;
+
+        const data = JSON.parse(raw);
+
+        lang = data.lang === "en" ? "en" : data.lang === "ja" ? "ja" : lang;
+        soundOn = data.soundOn !== false;
+
+        if (data.best && typeof data.best === "object") {
+          state.best = {};
+          Object.entries(data.best).forEach(function(entry) {
+            const stage = Number(entry[0]);
+            const score = Number(entry[1]);
+            if (Number.isInteger(stage) && Number.isFinite(score)) {
+              state.best[stage] = Math.max(0, Math.floor(score));
+            }
+          });
+        }
+      } catch (e) {
+        // ignore broken save
+      }
+
+      recalcUnlocked();
+    }
+
+    function saveSave() {
+      try {
+        const data = {
+          v: 4,
+          lang: lang,
+          soundOn: soundOn,
+          best: state.best
+        };
+        localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+      } catch (e) {
+        // localStorage may be blocked
+      }
+    }
+
+    // -----------------------------------------
+    // stage settings
+    // -----------------------------------------
+    function stageGoal(stage) {
+      return Math.min(26, 6 + Math.floor(stage / 4));
+    }
+
+    function stageMode(stage) {
+      if (stage <= 24) return 0;      // x only
+      if (stage <= 42) return 1;      // z only
+      if (stage <= 58) return 2;      // alternating
+      if (stage <= 76) return 3;      // diagonal
+      return 4;                       // hard random
+    }
+
+    function pseudoRandom(n) {
+      const x = Math.sin(n + 0.5) * 43758.5453123;
+      return x - Math.floor(x);
+    }
+
+    function makeAxisSeq(stage, length) {
+      const modes = [0, 1, 2];
+      const seq = [];
+
+      for (let i = 0; i < length; i++) {
+        const r = pseudoRandom(stage * 9871 + i * 197);
+        const idx = Math.max(0, Math.min(modes.length - 1, Math.floor(r * modes.length)));
+        seq.push(modes[idx]);
+      }
+
+      return seq;
+    }
+
+    function stageConfig(stage) {
+      const t = Math.max(0, (stage - 1) / (TOTAL_STAGES - 1));
+      const goal = stageGoal(stage);
+      const mode = stageMode(stage);
+
+      const cfg = {
+        stage: stage,
+        goal: goal,
+        mode: mode,
+        w: Math.max(3.2, 6.05 - t * 2.45),
+        d: Math.max(2.7, 5.25 - t * 2.35),
+        speed: 1.15 + t * 2.75,
+        maxAmp: 1.9 + t * 2.35,
+        baseAmp: 0.45 + t * 1.35,
+        startPhase: (stage * 0.725) % (Math.PI * 2),
+        axisSeq: []
+      };
+
+      if (mode === 4) {
+        cfg.axisSeq = makeAxisSeq(stage, goal);
+      }
+
+      return cfg;
+    }
+
+    function recalcUnlocked() {
+      let unlocked = 1;
+
+      while (unlocked < TOTAL_STAGES) {
+        const best = Number(state.best[unlocked] || 0);
+        if (best >= stageGoal(unlocked)) {
+          unlocked++;
+        } else {
+          break;
+        }
+      }
+
+      state.maxUnlocked = Math.max(1, Math.min(TOTAL_STAGES, unlocked));
+    }
+
+    // -----------------------------------------
+    // panel / i18n UI
+    // -----------------------------------------
+    function applyLang() {
+      document.documentElement.lang = lang;
+
+      setText("title", tt("title"));
+      setText("tag", tt("tag"));
+      setText("menuTitle", tt("title"));
+      setText("menuSub", tt("menuSub"));
+
+      ui.langBtn.textContent = lang === "ja" ? "English" : "日本語";
+      ui.soundBtn.textContent = tt("sound") + ": " + (soundOn ? tt("soundOn") : tt("soundOff"));
+
+      setText("pauseBtn", tt("pause"));
+      setText("lblStage", tt("lblStage"));
+      setText("lblScore", tt("lblScore"));
+      setText("lblBest", tt("lblBest"));
+      setText("stageResumeBtn", tt("stageResume"));
+
+      setText("pauseTitle", tt("pause"));
+      setText("pauseResumeBtn", tt("pauseResume"));
+      setText("pauseRestartBtn", tt("pauseRestart"));
+      setText("pauseToStageBtn", tt("pauseToStage"));
+
+      setText("resultRetryBtn", tt("resultRetry"));
+      setText("resultNextBtn", tt("resultNext"));
+      setText("resultMenuBtn", tt("resultMenu"));
+      setText("tapHint", tt("hint"));
+      setText("portraitText", tt("portrait"));
+
+      if (currentPanel === "stagePanel") {
+        renderStageList();
+      }
+
+      updateHud();
+    }
+
+    function showPanel(panelName) {
+      currentPanel = panelName || null;
+
+      Object.keys(panels).forEach(function(k) {
+        panels[k].classList.remove("show");
+      });
+
+      if (currentPanel && panels[currentPanel]) {
+        panels[currentPanel].classList.add("show");
+
+        if (currentPanel === "stagePanel") {
+          renderStageList();
+          updateStageResumeButton();
+        }
+      }
+
+      updateInput();
+    }
+
+    function hidePanels() {
+      showPanel(null);
+    }
+
+    function updateStageResumeButton() {
+      const canResume = !!currentGame && currentGame.active;
+      ui.stageResumeBtn.style.display = canResume ? "" : "none";
+    }
+
+    function renderStageList() {
+      ui.stageGrid.innerHTML = "";
+
+      const first = stagePage * STAGE_PAGE_SIZE + 1;
+      const last = Math.min(TOTAL_STAGES, first + STAGE_PAGE_SIZE - 1);
+
+      for (let stage = first; stage <= last; stage++) {
+        const btn = document.createElement("button");
+        btn.className = "chip";
+        btn.setAttribute("aria-label", "Stage " + stage);
+
+        const best = Number(state.best[stage] || 0);
+        const goal = stageGoal(stage);
+        const unlocked = stage <= state.maxUnlocked;
+        const cleared = best >= goal;
+
+        if (cleared) btn.classList.add("cleared");
+        if (!unlocked) {
+          btn.classList.add("locked");
+          btn.disabled = true;
+        }
+
+        btn.innerHTML =
+          "<strong>" + stage + "</strong>" +
+          "<small>" + best + "/" + goal + "</small>" +
+          (cleared ? '<span class="star">★</span>' : "");
+
+        btn.addEventListener("click", function() {
+          if (!unlocked) return;
+          if (stage > state.maxUnlocked) return;
+          startStage(stage);
+        });
+
+        ui.stageGrid.appendChild(btn);
+      }
+
+      setText("stagePageInfo", tt("page", {
+        v: stagePage + 1,
+        g: STAGE_PAGES
+      }));
+
+      ui.prevPage.disabled = stagePage === 0;
+      ui.nextPage.disabled = stagePage >= STAGE_PAGES - 1;
+
+      updateStageResumeButton();
+    }
+
+    function updateHud() {
+      if (!currentGame) {
+        setText("stageNo", "-");
+        setText("scoreVal", "0");
+        setText("goalVal", "0");
+        setText("bestVal", "0");
+        return;
+      }
+
+      const g = currentGame;
+      const best = Math.max(Number(state.best[g.stage] || 0), Number(g.placed || 0));
+
+      setText("stageNo", String(g.stage));
+      setText("scoreVal", String(g.placed));
+      setText("goalVal", String(g.goal));
+      setText("bestVal", String(best));
+    }
+
+    // -----------------------------------------
+    // audio: avoid AudioContext autoplay warning
+    // -----------------------------------------
+    let audioCtx = null;
+    let audioReady = false;
+    const audioPending = [];
+
+    function ensureAudioContext() {
+      if (audioCtx) return audioCtx;
+
+      const AudioCtor = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtor) return null;
+
+      try {
+        audioCtx = new AudioCtor();
+      } catch (e) {
+        audioCtx = null;
+      }
+
+      return audioCtx;
+    }
+
+    function markAudioReady() {
+      if (audioCtx && audioCtx.state === "running") {
+        audioReady = true;
+      } else {
+        audioReady = false;
+      }
+
+      if (audioReady) {
+        const list = audioPending.splice(0, audioPending.length);
+        for (let i = 0; i < list.length; i++) {
+          try {
+            if (soundOn) {
+              list[i]();
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+
+      return audioReady;
+    }
+
+    function resumeAudio() {
+      ensureAudioContext();
+
+      if (!audioCtx) return;
+      if (audioCtx.state === "closed") return;
+
+      if (audioCtx.state === "running") {
+        markAudioReady();
+        return;
+      }
+
+      try {
+        const p = audioCtx.resume();
+
+        if (p && typeof p.then === "function") {
+          p.then(function() {
+            markAudioReady();
+          }).catch(function() {
+            window.setTimeout(markAudioReady, 80);
+          });
+        } else {
+          window.setTimeout(markAudioReady, 30);
+        }
+      } catch (e) {
+        window.setTimeout(markAudioReady, 80);
+      }
+    }
+
+    // Called by the first real click/key. This prevents AudioContext before-gesture issues.
+    function unlockAudio() {
+      ensureAudioContext();
+      resumeAudio();
+    }
+
+    function scheduleSound(callback) {
+      if (!soundOn) return;
+
+      if (audioReady && audioCtx && audioCtx.state === "running") {
+        try {
+          callback();
+        } catch (e) {
+          // ignore
+        }
+        return;
+      }
+
+      audioPending.push(callback);
+      if (audioCtx) {
+        resumeAudio();
+      }
+    }
+
+    function beep(freq, dur, type, gain, when) {
+      if (!soundOn) return;
+      if (!audioCtx) return;
+      if (!audioReady) return;
+      if (audioCtx.state !== "running") return;
+
+      try {
+        const t = audioCtx.currentTime + (when || 0);
+
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+
+        o.type = type || "square";
+        o.frequency.setValueAtTime(freq || 660, t);
+
+        const v = gain || 0.035;
+        const d = dur || 0.06;
+
+        g.gain.setValueAtTime(v, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+
+        o.connect(g);
+        g.connect(audioCtx.destination);
+
+        o.start(t);
+        o.stop(t + d + 0.02);
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    function soundPlace(level) {
+      if (!soundOn) return;
+      scheduleSound(function() {
+        beep(520 + (Number(level || 0) * 32) % 640, 0.055, "triangle", 0.038);
+      });
+    }
+
+    function soundFail() {
+      if (!soundOn) return;
+      scheduleSound(function() {
+        beep(190, 0.13, "sawtooth", 0.055, 0);
+        beep(92, 0.22, "square", 0.045, 0.09);
+      });
+    }
+
+    function soundClear() {
+      if (!soundOn) return;
+      scheduleSound(function() {
+        beep(650, 0.07, "square", 0.035, 0);
+        beep(780, 0.07, "square", 0.035, 0.07);
+        beep(980, 0.11, "triangle", 0.040, 0.14);
+      });
+    }
+
+    function toggleSound() {
+      soundOn = !soundOn;
+      saveSave();
+      applyLang();
+
+      if (soundOn) {
+        unlockAudio();
+        scheduleSound(function() {
+          beep(700, 0.04, "square", 0.03);
+        });
+      } else {
+        audioPending.length = 0;
+      }
+    }
+
+    // -----------------------------------------
+    // input
+    // -----------------------------------------
+    function updateInput() {
+      inputActive =
+        currentPanel === null &&
+        !!currentGame &&
+        currentGame.active &&
+        !currentGame.paused;
+    }
+
+    function tryPlace() {
+      if (!inputActive || !currentGame) return;
+      placeBlock(currentGame);
+    }
+
+    // -----------------------------------------
+    // THREE.js helpers
+    // -----------------------------------------
+    function createCheckerTexture() {
+      const size = 256;
+      const c = document.createElement("canvas");
+      c.width = c.height = size;
+
+      const ctx = c.getContext("2d");
+
+      const light = "#f5f6f8";
+      const dark = "#b7bbc1";
+
+      ctx.fillStyle = light;
+      ctx.fillRect(0, 0, size, size);
+
+      ctx.fillStyle = dark;
+      const half = size / 2;
+      ctx.fillRect(0, 0, half, half);
+      ctx.fillRect(half, half, half, half);
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.magFilter = THREE.NearestFilter;
+      tex.minFilter = THREE.NearestFilter;
+      tex.anisotropy = 4;
+      tex.needsUpdate = true;
+
+      return tex;
+    }
+
+    function initThree() {
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x071425);
+      scene.fog = new THREE.Fog(0x071425, 26, 92);
+
+      camera = new THREE.PerspectiveCamera(
+        48,
+        Math.max(1, window.innerWidth) / Math.max(1, window.innerHeight),
+        0.1,
+        260
+      );
+
+      camera.position.set(12, 17, 19);
+      camera.lookAt(0, 0, 0);
+
+      renderer = new THREE.WebGLRenderer({
+        canvas: ui.canvas,
+        antialias: window.innerWidth > 720,
+        alpha: false,
+        powerPreference: "high-performance"
+      });
+
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.6));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      const hemi = new THREE.HemisphereLight(0xcfe3ff, 0x14243a, 0.78);
+      scene.add(hemi);
+
+      const dir = new THREE.DirectionalLight(0xffffff, 0.62);
+      dir.position.set(6, 15, 9);
+      scene.add(dir);
+
+      const ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(120, 120),
+        new THREE.MeshLambertMaterial({ color: 0x0b2039 })
+      );
+
+      ground.rotation.x = -Math.PI / 2;
+      ground.position.y = -0.25;
+      scene.add(ground);
+
+      const grid = new THREE.GridHelper(80, 80, 0x25466f, 0x14253c);
+      grid.material.transparent = true;
+      grid.material.opacity = 0.4;
+      grid.position.y = -0.2;
+      scene.add(grid);
+
+      sharedBlockGeom = new THREE.BoxGeometry(1, 1, 1);
+      baseCheckerTexture = createCheckerTexture();
+
+      resize();
+    }
+
+    function faceMaterial(repU, repV, color) {
+      if (!baseCheckerTexture) return null;
+
+      const tex = baseCheckerTexture.clone();
+      tex.needsUpdate = true;
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.magFilter = THREE.NearestFilter;
+      tex.minFilter = THREE.NearestFilter;
+      tex.repeat.set(Math.max(0.1, Number(repU) || 1), Math.max(0.1, Number(repV) || 1));
+
+      return new THREE.MeshLambertMaterial({
+        map: tex,
+        color: color,
+        flatShading: false
+      });
+    }
+
+    function makeBlockMaterials(width, depth, color) {
+      const topColor = color.clone();
+      const sideColor = color.clone().multiplyScalar(0.74);
+
+      // material order: +X, -X, +Y, -Y, +Z, -Z
+      const sideDepthHeight = faceMaterial(Math.max(0.1, depth), H_REPEAT, sideColor);
+      const sideWidthHeight = faceMaterial(Math.max(0.1, width), H_REPEAT, sideColor);
+
+      const topFace = faceMaterial(Math.max(0.1, width) * 1.15, Math.max(0.1, depth) * 1.15, topColor);
+      const bottomFace = faceMaterial(Math.max(0.1, width) * 1.15, Math.max(0.1, depth) * 1.15, topColor.clone().multiplyScalar(0.55));
+
+      return [
+        sideDepthHeight,
+        sideDepthHeight,
+        topFace,
+        bottomFace,
+        sideWidthHeight,
+        sideWidthHeight
+      ];
+    }
+
+    function disposeMaterialArray(materials) {
+      const mats = Array.isArray(materials) ? materials : [materials];
+      const seen = [];
+
+      mats.forEach(function(m) {
+        if (!m) return;
+        if (seen.indexOf(m) !== -1) return;
+
+        seen.push(m);
+
+        if (m.map && m.map !== baseCheckerTexture) {
+          try {
+            m.map.dispose();
+          } catch (e) {}
+        }
+
+        try {
+          m.dispose();
+        } catch (e) {}
+      });
+    }
+
+    function disposeMesh(mesh) {
+      if (!mesh) return;
+
+      disposeMaterialArray(mesh.material);
+
+      if (mesh.geometry && mesh.geometry !== sharedBlockGeom) {
+        try {
+          mesh.geometry.dispose();
+        } catch (e) {}
+      }
+
+      if (mesh.parent) {
+        mesh.parent.remove(mesh);
+      }
+    }
+
+    function disposeGroup(group) {
+      if (!group) return;
+
+      const children = Array.prototype.slice.call(group.children);
+      children.forEach(function(child) {
+        disposeMesh(child);
+      });
+
+      if (group.parent) {
+        group.parent.remove(group);
+      }
+    }
+
+    function disposeGame(game, saveProgress) {
+      if (!game) return;
+
+      if (saveProgress !== false) {
+        saveStageProgress(game);
+      }
+
+      disposeGroup(game.group);
+      disposeMesh(game.movingMesh);
+
+      game.group = null;
+      game.movingMesh = null;
+
+      if (currentGame === game) {
+        currentGame = null;
+      }
+    }
+
+    // -----------------------------------------
+    // game core helpers
+    // -----------------------------------------
+    function centerOfRect(rect) {
+      return {
+        x: (rect.x0 + rect.x1) / 2,
+        z: (rect.z0 + rect.z1) / 2
+      };
+    }
+
+    function makeBlockMesh(w, d, y, x, z, color, isMoving) {
+      const width = Math.max(0.08, Number(w) || 1);
+      const depth = Math.max(0.08, Number(d) || 1);
+
+      let blockColor = color.clone();
+      if (isMoving) {
+        blockColor = blockColor.offsetHSL(0, 0.06, 0.16);
+      }
+
+      const mat = makeBlockMaterials(width, depth, blockColor);
+      const mesh = new THREE.Mesh(sharedBlockGeom, mat);
+
+      mesh.scale.set(width, BLOCK_H, depth);
+      mesh.position.set(x, y, z);
+      mesh.renderOrder = isMoving ? 2 : 0;
+
+      return mesh;
+    }
+
+    function getStageColor(stage) {
+      const hue = (Number(stage || 1) * 0.183 + 0.05) % 1;
+      return new THREE.Color().setHSL(hue, 0.56, 0.63);
+    }
+
+    function currentAxisMode(game) {
+      const cfg = game.cfg;
+      const drop = game.placed;
+
+      if (cfg.mode === 2) {
+        return drop % 2 === 0 ? 0 : 1;
+      }
+
+      if (cfg.mode === 4) {
+        const raw = Number((cfg.axisSeq || [])[drop] || 0);
+        return raw;
+      }
+
+      return cfg.mode;
+    }
+
+    function calcMoveOffset(game) {
+      const mode = currentAxisMode(game);
+      const maxDim = Math.max(game.dims.w, game.dims.d);
+
+      let amp = Math.max(0.25, Math.min(game.cfg.maxAmp, maxDim * 0.56 + game.cfg.baseAmp));
+      const t = game.time + game.cfg.startPhase;
+
+      let ox = 0;
+      let oz = 0;
+
+      if (mode === 0) {
+        ox = Math.sin(t) * amp;
+      } else if (mode === 1) {
+        oz = Math.sin(t * 0.88 + 0.9) * amp;
+      } else if (mode === 2) {
+        // alternating inside random / alternate mode
+        if (game.placed % 2 === 0) {
+          ox = Math.sin(t) * amp;
+        } else {
+          oz = Math.sin(t * 0.92 + 0.65) * amp;
+        }
+      } else if (mode === 3) {
+        ox = Math.sin(t) * amp;
+        oz = Math.sin(t * 0.94 + 1.15) * amp * 0.72;
+      } else {
+        // safety fallback: diagonal
+        ox = Math.sin(t) * amp;
+        oz = Math.sin(t * 1.06 + 0.5) * amp * 0.65;
+      }
+
+      const maxMove = Math.max(amp, game.dims.w + 1.0, game.dims.d + 1.0);
+
+      ox = Math.max(-maxMove, Math.min(maxMove, ox));
+      oz = Math.max(-maxMove, Math.min(maxMove, oz));
+
+      return { x: ox, z: oz };
+    }
+
+    function updateCamera(dt) {
+      if (!currentGame) return;
+
+      const desired = currentGame.movingY - BLOCK_H * 2.2;
+      const minLook = -0.3;
+      const target = Math.max(minLook, desired);
+
+      lookSmooth += (target - lookSmooth) * Math.min(1, dt * 5.5);
+
+      camera.position.x = 13;
+      camera.position.y = lookSmooth + 17.8;
+      camera.position.z = 17.5;
+
+      camera.lookAt(0, lookSmooth, 0);
+      camera.updateProjectionMatrix();
+    }
+
+    function updateGame(dt) {
+      if (!currentGame || !currentGame.active || currentGame.paused) return;
+
+      currentGame.time += dt * currentGame.cfg.speed;
+
+      const g = currentGame;
+
+      if (g.movingMesh) {
+        const c = centerOfRect(g.top);
+        const off = calcMoveOffset(g);
+
+        g.offX = off.x;
+        g.offZ = off.z;
+
+        g.movingMesh.position.x = c.x + g.offX;
+        g.movingMesh.position.z = c.z + g.offZ;
+        g.movingMesh.position.y = g.movingY;
+      }
+
+      updateCamera(dt);
+    }
+
+    function removeMovingMesh(g) {
+      if (g && g.movingMesh) {
+        if (g.movingMesh.parent) {
+          g.movingMesh.parent.remove(g.movingMesh);
+        }
+        disposeMesh(g.movingMesh);
+        g.movingMesh = null;
+      }
+    }
+
+    function createMovingMesh(g) {
+      if (!g) return;
+
+      removeMovingMesh(g);
+
+      if (!g.active) return;
+
+      const c = centerOfRect(g.top);
+      const color = getStageColor(g.stage);
+
+      g.movingMesh = makeBlockMesh(
+        g.dims.w,
+        g.dims.d,
+        g.movingY,
+        c.x,
+        c.z,
+        color,
+        true
+      );
+
+      g.group.add(g.movingMesh);
+      updateGame(0);
+    }
+
+    function saveStageProgress(g) {
+      if (!g) return;
+
+      const key = Number(g.stage || 0);
+      if (!key) return;
+
+      const old = Number(state.best[key] || 0);
+      const now = Number(g.placed || 0);
+
+      if (now > old) {
+        state.best[key] = now;
+      }
+
+      recalcUnlocked();
+      saveSave();
+    }
+
+    function finishStage(g, won) {
+      if (!g || !g.active) return;
+
+      g.active = false;
+      g.paused = false;
+      g.won = !!won;
+
+      removeMovingMesh(g);
+      saveStageProgress(g);
+
+      if (won) {
+        soundClear();
+      } else {
+        soundFail();
+      }
+
+      updateHud();
+      showResultPanel(g);
+    }
+
+    function placeBlock(g) {
+      if (!g.active || g.paused || !g.movingMesh) return;
+
+      removeMovingMesh(g);
+
+      const c = centerOfRect(g.top);
+
+      const mx = c.x + Number(g.offX || 0);
+      const mz = c.z + Number(g.offZ || 0);
+
+      const movingRect = {
+        x0: mx - g.dims.w / 2,
+        x1: mx + g.dims.w / 2,
+        z0: mz - g.dims.d / 2,
+        z1: mz + g.dims.d / 2
+      };
+
+      const t = g.top;
+
+      const x0 = Math.max(t.x0, movingRect.x0);
+      const x1 = Math.min(t.x1, movingRect.x1);
+      const z0 = Math.max(t.z0, movingRect.z0);
+      const z1 = Math.min(t.z1, movingRect.z1);
+
+      const newW = x1 - x0;
+      const newD = z1 - z0;
+
+      if (newW <= MIN_OVERLAP || newD <= MIN_OVERLAP) {
+        finishStage(g, false);
+        return;
+      }
+
+      const nx = (x0 + x1) / 2;
+      const nz = (z0 + z1) / 2;
+
+      const stageColor = getStageColor(g.stage);
+      const placedColor = stageColor.clone();
+      placedColor.offsetHSL(0, 0, -Math.min(0.24, g.placed * 0.008));
+
+      const blockMesh = makeBlockMesh(
+        newW,
+        newD,
+        g.movingY,
+        nx,
+        nz,
+        placedColor,
+        false
+      );
+
+      g.group.add(blockMesh);
+
+      g.placed += 1;
+      g.dims.w = newW;
+      g.dims.d = newD;
+      g.stackCount = g.placed + 1;
+      g.movingY = g.stackCount * BLOCK_H + BLOCK_H / 2;
+
+      g.top = {
+        x0: x0,
+        x1: x1,
+        z0: z0,
+        z1: z1
+      };
+
+      saveStageProgress(g);
+      updateHud();
+      soundPlace(g.placed);
+
+      if (g.placed >= g.goal) {
+        finishStage(g, true);
+        return;
+      }
+
+      createMovingMesh(g);
+      updateInput();
+    }
+
+    function startStage(stage) {
+      stage = Number(stage);
+
+      if (!Number.isInteger(stage)) return;
+      if (stage < 1 || stage > TOTAL_STAGES) return;
+      if (stage > state.maxUnlocked) return;
+
+      if (!THREE || !scene) {
+        showPanel("stagePanel");
+        setText("menuSub", "3D engine is not ready. Please reload or check three.js loading.");
+        setText("tapHint", "3D engine not ready.");
+        return;
+      }
+
+      if (currentGame) {
+        disposeGame(currentGame, true);
+      }
+
+      const cfg = stageConfig(stage);
+      const w = Math.max(0.1, cfg.w);
+      const d = Math.max(0.1, cfg.d);
+
+      const game = {
+        stage: stage,
+        cfg: cfg,
+        goal: cfg.goal,
+        placed: 0,
+        stackCount: 1,
+        dims: {
+          w: w,
+          d: d
+        },
+        top: {
+          x0: -w / 2,
+          x1: w / 2,
+          z0: -d / 2,
+          z1: d / 2
+        },
+        time: cfg.startPhase,
+        offX: 0,
+        offZ: 0,
+        movingY: BLOCK_H * 1.5,
+        active: true,
+        paused: false,
+        won: false,
+        group: new THREE.Group(),
+        movingMesh: null
+      };
+
+      currentGame = game;
+      scene.add(game.group);
+
+      const baseColor = getStageColor(stage);
+      const base = makeBlockMesh(w, d, BLOCK_H / 2, 0, 0, baseColor, false);
+      game.group.add(base);
+
+      lookSmooth = game.movingY - BLOCK_H * 2.2;
+
+      hidePanels();
+      createMovingMesh(game);
+      updateHud();
+      updateInput();
+
+      if (soundOn) {
+        unlockAudio();
+        soundPlace(0);
+      }
+    }
+
+    function showResultPanel(g) {
+      if (!g) return;
+
+      setText("resultTitle", tt(g.won ? "resultClear" : "resultFail"));
+      ui.resultScore.textContent = String(g.placed) + "/" + String(g.goal);
+
+      const parts = [];
+      parts.push("Stage " + g.stage);
+      parts.push(tt("progress", {
+        v: g.placed,
+        g: g.goal
+      }));
+
+      const best = Number(state.best[g.stage] || 0);
+      if (best > 0) {
+        parts.push(tt("saved"));
+      }
+
+      ui.resultStats.textContent = parts.join(" • ");
+
+      const canNext =
+        g.won &&
+        g.stage < TOTAL_STAGES &&
+        state.maxUnlocked > g.stage;
+
+      ui.resultNextBtn.disabled = !canNext;
+      ui.resultNextBtn.textContent = canNext ? tt("resultNext") : tt("nextLocked");
+
+      showPanel("resultPanel");
+    }
+
+    function resumeGame() {
+      if (!currentGame || !currentGame.active) return;
+      currentGame.paused = false;
+      hidePanels();
+    }
+
+    function pauseGame() {
+      if (!currentGame || !currentGame.active) return;
+      currentGame.paused = true;
+      showPanel("pausePanel");
+    }
+
+    function resumeFromMenu() {
+      if (!currentGame || !currentGame.active) return;
+      currentGame.paused = false;
+      hidePanels();
+    }
+
+    // -----------------------------------------
+    // events
+    // -----------------------------------------
+    function bindEvents() {
+      // game input on canvas/background only
+      window.addEventListener("pointerdown", function(ev) {
+        if (!inputActive) return;
+
+        const target = ev.target;
+        if (ui.topbar.contains(target)) return;
+        if (target.closest && target.closest("button")) return;
+
+        tryPlace();
+      }, { passive: true });
+
+      window.addEventListener("keydown", function(ev) {
+        if (!inputActive) return;
+        if (ev.repeat) return;
+
+        if (ev.code === "Space" || ev.key === " " || ev.key === "Enter") {
+          ev.preventDefault();
+          tryPlace();
+        }
+      });
+
+      // unlock audio on first click/key. Do NOT use passive pointerdown for this warning case.
+      window.addEventListener("click", unlockAudio, {
+        once: true,
+        capture: true
+      });
+
+      window.addEventListener("keydown", unlockAudio, {
+        once: true,
+        capture: true
+      });
+
+      // UI buttons
+      ui.langBtn.addEventListener("click", function() {
+        lang = lang === "ja" ? "en" : "ja";
+        saveSave();
+        applyLang();
+        renderStageList();
+        updateStageResumeButton();
+      });
+
+      ui.soundBtn.addEventListener("click", toggleSound);
+
+      ui.pauseBtn.addEventListener("click", function() {
+        if (!currentGame || !currentGame.active) return;
+
+        if (currentPanel === "pausePanel") {
+          resumeGame();
+        } else {
+          pauseGame();
+        }
+      });
+
+      ui.stageResumeBtn.addEventListener("click", resumeFromMenu);
+
+      ui.prevPage.addEventListener("click", function() {
+        stagePage = Math.max(0, stagePage - 1);
+        renderStageList();
+      });
+
+      ui.nextPage.addEventListener("click", function() {
+        stagePage = Math.min(STAGE_PAGES - 1, stagePage + 1);
+        renderStageList();
+      });
+
+      ui.pauseResumeBtn.addEventListener("click", resumeGame);
+
+      ui.pauseRestartBtn.addEventListener("click", function() {
+        if (!currentGame) {
+          showPanel("stagePanel");
+          return;
+        }
+        startStage(currentGame.stage);
+      });
+
+      ui.pauseToStageBtn.addEventListener("click", function() {
+        if (currentGame && currentGame.active) {
+          currentGame.paused = true;
+        }
+        showPanel("stagePanel");
+      });
+
+      ui.resultRetryBtn.addEventListener("click", function() {
+        if (!currentGame) {
+          showPanel("stagePanel");
+          return;
+        }
+        startStage(currentGame.stage);
+      });
+
+      ui.resultNextBtn.addEventListener("click", function() {
+        if (!currentGame || currentGame.stage >= TOTAL_STAGES) {
+          showPanel("stagePanel");
+          return;
+        }
+
+        if (state.maxUnlocked > currentGame.stage) {
+          startStage(currentGame.stage + 1);
+        } else {
+          showPanel("stagePanel");
+        }
+      });
+
+      ui.resultMenuBtn.addEventListener("click", function() {
+        if (currentGame) {
+          disposeGame(currentGame, true);
+        }
+        showPanel("stagePanel");
+      });
+
+      window.addEventListener("resize", resize);
+      window.addEventListener("orientationchange", resize);
+
+      window.addEventListener("pagehide", function() {
+        saveSave();
+      });
+
+      document.addEventListener("visibilitychange", function() {
+        if (document.hidden) {
+          saveSave();
+          if (currentGame) {
+            saveStageProgress(currentGame);
+          }
+        }
+      });
+    }
+
+    function resize() {
+      const w = Math.max(1, window.innerWidth);
+      const h = Math.max(1, window.innerHeight);
+
+      if (!renderer) return;
+
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+
+    // -----------------------------------------
+    // animation loop
+    // -----------------------------------------
+    function animate(now) {
+      const dt = Math.min(0.05, Math.max(0, (now - clockPrev) / 1000));
+      clockPrev = now;
+
+      if (inputActive) {
+        updateGame(dt);
+      } else if (currentGame) {
+        updateCamera(dt);
+      }
+
+      if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    // -----------------------------------------
+    // boot
+    // -----------------------------------------
+    function boot() {
+      loadSave();
+      applyLang();
+
+      renderStageList();
+      showPanel("stagePanel");
+      bindEvents();
+
+      try {
+        initThree();
+      } catch (e) {
+        setText("menuSub", "Failed to initialize 3D engine: " + (e && e.message ? e.message : e));
+        setText("tapHint", "3D engine initialization failed.");
+        showPanel("stagePanel");
+        return;
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    boot();
+  </script>
+</body>
+</html>
